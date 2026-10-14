@@ -5,6 +5,7 @@ createApp({
     return {
       cityInput: "",
       searchedName: "",
+      isPlaceListOpen: false,
       forecast: null,
       isLoading: false,
       errorMessage: ""
@@ -12,20 +13,38 @@ createApp({
   },
 
   methods: {
-    async searchCity() {
+    searchCity() {
       this.searchedName = this.cityInput;
+      return this.loadForecast(0);
+    },
+
+    choosePlace(place) {
+      return this.loadForecast(place.matchIndex);
+    },
+
+    async loadForecast(matchIndex) {
+      this.isPlaceListOpen = false;
       this.isLoading = true;
       this.errorMessage = "";
 
       try {
         this.forecast = await this.getJson(
-          `/api/forecast/${encodeURIComponent(this.searchedName)}`);
+          `/api/forecast/${encodeURIComponent(this.searchedName)}?match=${matchIndex}`);
       } catch (error) {
         this.forecast = null;
         this.errorMessage = error.message;
       } finally {
         this.isLoading = false;
       }
+    },
+
+    describePlace(place) {
+      const parts = [place.name];
+      if (place.state) {
+        parts.push(place.state);
+      }
+      parts.push(place.country);
+      return parts.join(", ");
     },
 
     async getJson(url) {

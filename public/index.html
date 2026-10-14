@@ -19,6 +19,19 @@
     </form>
 
     <p v-if="errorMessage" role="alert">{{ errorMessage }}</p>
+    <p v-else-if="!forecast">Enter a city to see what to pack for the next 3 days.</p>
+    <div v-else v-on:keydown.esc="isPlaceListOpen = false">
+      Showing {{ describePlace(forecast.city) }}.
+      <button v-if="forecast.otherMatches.length > 0" type="button"
+              :aria-expanded="isPlaceListOpen" v-on:click="isPlaceListOpen = !isPlaceListOpen">
+        Not the right {{ forecast.city.name }}?
+      </button>
+      <ul v-if="isPlaceListOpen">
+        <li v-for="place in forecast.otherMatches" :key="place.matchIndex">
+          <button type="button" v-on:click="choosePlace(place)">{{ describePlace(place) }}</button>
+        </li>
+      </ul>
+    </div>
 
     <ul v-if="forecast">
       <li v-for="day in forecast.days" :key="day.date">
