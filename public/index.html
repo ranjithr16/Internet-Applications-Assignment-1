@@ -8,7 +8,26 @@
 
 <body>
   <div id="app" class="page">
+    <h1 v-if="forecast">{{ forecast.city.name }}, {{ forecast.city.country }}</h1>
+    <h1 v-else>Where are you going?</h1>
+
+    <form v-on:submit.prevent="searchCity">
+      <input v-model.trim="cityInput" type="text" placeholder="Dublin, Lisbon, Tokyo" aria-label="City">
+      <button type="submit" :disabled="isLoading || cityInput === ''">
+        {{ isLoading ? 'Getting forecast…' : 'Get forecast' }}
+      </button>
+    </form>
+
+    <p v-if="errorMessage" role="alert">{{ errorMessage }}</p>
+
+    <ul v-if="forecast">
+      <li v-for="day in forecast.days" :key="day.date">
+        {{ day.date }}: {{ day.minTemperature }}° to {{ day.maxTemperature }}°,
+        wind {{ day.averageWindSpeed }} m/s, rain {{ day.rainfall }} mm
+      </li>
+    </ul>
   </div>
+
   <script type="module" src="app.js"></script>
 </body>
 </html>
