@@ -200,6 +200,16 @@ p {
 .air     { grid-area: air; }
 .area    { grid-area: area; }
 
+.trip,
+.results {
+  transition: opacity 0.2s;
+}
+
+.stale {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 @keyframes arrive {
   from {
     opacity: 0;

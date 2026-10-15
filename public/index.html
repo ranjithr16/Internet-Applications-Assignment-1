@@ -44,7 +44,7 @@
         </div>
       </header>
 
-      <section v-if="forecast" class="trip" aria-labelledby="packing-title">
+      <section v-if="forecast" class="trip" :class="{ stale: isShowingPreviousCity }" aria-labelledby="packing-title">
         <h2 id="packing-title">Packing list</h2>
         <ul class="checklist">
           <li v-for="item in packingList()" :key="item.name">
@@ -58,7 +58,7 @@
       </section>
     </div>
 
-    <main v-if="forecast" class="results">
+    <main v-if="forecast" class="results" :class="{ stale: isShowingPreviousCity }">
       <section class="panel summary" aria-labelledby="summary-title">
         <div class="panel-heading">
           <h2 id="summary-title">Next 3 days</h2>

@@ -16,6 +16,7 @@ createApp({
       searchedName: "",
       isPlaceListOpen: false,
       forecast: null,
+      isShowingPreviousCity: false,
       isLoading: false,
       errorMessage: "",
       coldBelow: COLD_BELOW,
@@ -34,19 +35,31 @@ createApp({
     },
 
     async loadForecast(matchIndex) {
+      const previousForecast = this.forecast;
       this.isPlaceListOpen = false;
       this.isLoading = true;
+      this.isShowingPreviousCity = previousForecast !== null;
       this.errorMessage = "";
 
       try {
-        this.forecast = await this.getJson(
+        const forecast = await this.getJson(
           `/api/forecast/${encodeURIComponent(this.searchedName)}?match=${matchIndex}`);
+        this.clearResults();
+        this.forecast = forecast;
+        this.isShowingPreviousCity = false;
       } catch (error) {
-        this.forecast = null;
+        if (this.forecast === previousForecast) {
+          this.clearResults();
+        }
         this.errorMessage = error.message;
       } finally {
         this.isLoading = false;
+        this.isShowingPreviousCity = false;
       }
+    },
+
+    clearResults() {
+      this.forecast = null;
     },
 
     findRainyDays() {

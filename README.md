@@ -23,7 +23,7 @@ The app is at http://localhost:3000. To use a different port, change `PORT` in `
 
 ## What it does
 
-Type a city and press **Get forecast**. The app shows the best match for that name, and if other places share it (Dublin, Ireland and Dublin, Ohio, for example), a **Not the right Dublin?** link lists them so you can switch.
+Type a city and press **Get forecast**. The app shows the best match for that name, and if other places share it (Dublin, Ireland and Dublin, Ohio, for example), a **Not the right Dublin?** link lists them so you can switch. While a new place loads, the previous results stay on screen, faded, until the new forecast arrives.
 
 For the chosen place it builds a packing list from the next three days:
 
