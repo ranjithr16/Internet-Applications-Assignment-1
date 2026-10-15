@@ -4,28 +4,46 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pack for the weather</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Sans:wght@400..700&display=swap">
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
   <div id="app" class="page">
-    <h1 v-if="forecast">{{ forecast.city.name }}, {{ forecast.city.country }}</h1>
-    <h1 v-else>Where are you going?</h1>
+    <div class="lead">
+      <header class="masthead">
+        <p class="wordmark">Pack for the weather</p>
+        <h1 v-if="forecast" class="headline">
+          {{ forecast.city.name }}<span class="country">{{ forecast.city.country }}</span>
+        </h1>
+        <h1 v-else class="headline">Where are you going?</h1>
 
-    <form v-on:submit.prevent="searchCity">
-      <input v-model.trim="cityInput" type="text" placeholder="Dublin, Lisbon, Tokyo" aria-label="City">
-      <button type="submit" :disabled="isLoading || cityInput === ''">
-        {{ isLoading ? 'Getting forecast…' : 'Get forecast' }}
-      </button>
-    </form>
+        <form class="search" v-on:submit.prevent="searchCity">
+          <input v-model.trim="cityInput" type="text" placeholder="Dublin, Lisbon, Tokyo" aria-label="City">
+          <button type="submit" :disabled="isLoading || cityInput === ''">
+            {{ isLoading ? 'Getting forecast…' : 'Get forecast' }}
+          </button>
+        </form>
 
-    <p v-if="errorMessage" role="alert">{{ errorMessage }}</p>
-    <p v-else-if="!forecast">Enter a city to see what to pack for the next 3 days.</p>
-    <div v-else v-on:keydown.esc="isPlaceListOpen = false">
-      Showing {{ describePlace(forecast.city) }}.
-      <button v-if="forecast.otherMatches.length > 0" type="button"
-              :aria-expanded="isPlaceListOpen" v-on:click="isPlaceListOpen = !isPlaceListOpen">
-        Not the right {{ forecast.city.name }}?
-      </button>
+        <p v-if="errorMessage" class="error" role="alert">{{ errorMessage }}</p>
+        <p v-else-if="!forecast" class="hint">
+          Enter a city to see what to pack for the next 3 days.
+        </p>
+        <div v-else class="place hint" v-on:keydown.esc="isPlaceListOpen = false">
+          Showing {{ describePlace(forecast.city) }}.
+          <button v-if="forecast.otherMatches.length > 0" type="button" class="text-button"
+                  :aria-expanded="isPlaceListOpen" v-on:click="isPlaceListOpen = !isPlaceListOpen">
+            Not the right {{ forecast.city.name }}?
+          </button>
+          <ul v-if="isPlaceListOpen" class="place-list">
+            <li v-for="place in forecast.otherMatches" :key="place.matchIndex">
+              <button type="button" v-on:click="choosePlace(place)">{{ describePlace(place) }}</button>
+            </li>
+          </ul>
+        </div>
+      </header>
+
       <section v-if="forecast" class="trip" aria-labelledby="packing-title">
         <h2 id="packing-title">Packing list</h2>
         <ul class="checklist">
@@ -38,11 +56,6 @@
           </li>
         </ul>
       </section>
-      <ul v-if="isPlaceListOpen">
-        <li v-for="place in forecast.otherMatches" :key="place.matchIndex">
-          <button type="button" v-on:click="choosePlace(place)">{{ describePlace(place) }}</button>
-        </li>
-      </ul>
     </div>
 
     <ul v-if="forecast">
