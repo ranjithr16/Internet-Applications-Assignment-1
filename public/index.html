@@ -58,12 +58,53 @@
       </section>
     </div>
 
-    <ul v-if="forecast">
-      <li v-for="day in forecast.days" :key="day.date">
-        {{ day.date }}: {{ day.minTemperature }}° to {{ day.maxTemperature }}°,
-        wind {{ day.averageWindSpeed }} m/s, rain {{ day.rainfall }} mm
-      </li>
-    </ul>
+    <main v-if="forecast" class="results">
+      <section class="panel summary" aria-labelledby="summary-title">
+        <div class="panel-heading">
+          <h2 id="summary-title">Next 3 days</h2>
+          <p class="legend">
+            <span><span class="swatch cold"></span>Cold, below {{ coldBelow }}°</span>
+            <span><span class="swatch mild"></span>Mild</span>
+            <span><span class="swatch hot"></span>Hot, above {{ hotAbove }}°</span>
+          </p>
+        </div>
+        <table :style="scaleStyle()">
+          <thead>
+            <tr>
+              <th scope="col">Day</th>
+              <th scope="col" class="temperature-heading">
+                Temperature
+                <span class="scale-marks" aria-hidden="true">
+                  <span class="mark cold-mark">{{ coldBelow }}°</span>
+                  <span class="mark hot-mark">{{ hotAbove }}°</span>
+                </span>
+              </th>
+              <th scope="col" class="number">Wind</th>
+              <th scope="col" class="number">Rain</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="day in forecast.days" :key="day.date">
+              <th scope="row">
+                {{ formatShortWeekday(day.date) }}
+                <span class="date">{{ formatDate(day.date) }}</span>
+              </th>
+              <td>
+                <div class="range-track" aria-hidden="true">
+                  <span class="range-bar" :style="rangeBarStyle(day)"></span>
+                </div>
+                <span class="range-text">
+                  {{ day.minTemperature }}° to {{ day.maxTemperature }}°
+                  <span class="average">avg {{ day.averageTemperature }}°C</span>
+                </span>
+              </td>
+              <td class="number">{{ day.averageWindSpeed }} <span class="unit">m/s</span></td>
+              <td class="number">{{ day.rainfall }} <span class="unit">mm</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
   </div>
 
   <script type="module" src="app.js"></script>

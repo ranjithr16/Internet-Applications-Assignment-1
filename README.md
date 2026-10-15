@@ -32,7 +32,7 @@ For the chosen place it builds a packing list from the next three days:
 - **Light layers** if any day spends time between 8°C and 24°C.
 - **Light clothing, sunglasses and sun cream** if any day goes above 24°C.
 
-A single day can trigger more than one item, for example a cold morning that warms up to a mild afternoon. Each item says which days it applies to and the relevant temperatures. Below the list, each day's low, high, average wind and total rain are shown.
+A single day can trigger more than one item, for example a cold morning that warms up to a mild afternoon. Each item says which days it applies to and the relevant temperatures. Alongside the list, a **Next 3 days** table shows each day's low, high and average temperature, average wind and total rain. Each day has a bar showing its range against cold (below 8°C), mild and hot (above 24°C) zones.
 
 ## How it is built
 

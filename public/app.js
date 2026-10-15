@@ -3,7 +3,11 @@ import { createApp } from "https://unpkg.com/vue@3/dist/vue.esm-browser.js";
 const COLD_BELOW = 8;
 const HOT_ABOVE = 24;
 
+const SCALE_PADDING = 4;
+
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const SHORT_NAME_LENGTH = 3;
 
 createApp({
   data() {
@@ -13,7 +17,9 @@ createApp({
       isPlaceListOpen: false,
       forecast: null,
       isLoading: false,
-      errorMessage: ""
+      errorMessage: "",
+      coldBelow: COLD_BELOW,
+      hotAbove: HOT_ABOVE
     };
   },
 
@@ -136,8 +142,43 @@ createApp({
       return body;
     },
 
+    temperatureScale() {
+      const days = this.forecast.days;
+      return {
+        min: Math.min(this.lowestTemperature(days), COLD_BELOW) - SCALE_PADDING,
+        max: Math.max(this.highestTemperature(days), HOT_ABOVE) + SCALE_PADDING
+      };
+    },
+
+    scalePercent(temperature) {
+      const scale = this.temperatureScale();
+      return ((temperature - scale.min) / (scale.max - scale.min)) * 100;
+    },
+
+    scaleStyle() {
+      return {
+        "--cold-end": `${this.scalePercent(COLD_BELOW)}%`,
+        "--hot-start": `${this.scalePercent(HOT_ABOVE)}%`
+      };
+    },
+
+    rangeBarStyle(day) {
+      const start = this.scalePercent(day.minTemperature);
+      const end = this.scalePercent(day.maxTemperature);
+      return { left: `${start}%`, width: `${end - start}%` };
+    },
+
     formatWeekday(isoDate) {
       return WEEKDAY_NAMES[this.toDate(isoDate).getUTCDay()];
+    },
+
+    formatShortWeekday(isoDate) {
+      return this.formatWeekday(isoDate).slice(0, SHORT_NAME_LENGTH);
+    },
+
+    formatDate(isoDate) {
+      const date = this.toDate(isoDate);
+      return `${date.getUTCDate()} ${MONTH_NAMES[date.getUTCMonth()]}`;
     },
 
     toDate(isoDate) {
