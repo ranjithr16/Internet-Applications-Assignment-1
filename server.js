@@ -1,6 +1,6 @@
 "use strict";
 
-const express = require('express');
+const express = require("express");
 const path = require("path");
 
 const app = express();
@@ -17,9 +17,64 @@ if (!apiKey) {
   process.exit(1);
 }
 
+const AIR_QUALITY_LEVELS = ["Good", "Fair", "Moderate", "Poor", "Very Poor"];
+
+const POLLUTANTS = [
+  {
+    code: "so2",
+    name: "Sulphur dioxide (SO₂)",
+    symbol: "SO₂",
+    bandLowerBounds: [20, 80, 250, 350],
+    healthRisk: "Irritates the nose, throat and airways and can trigger wheezing and chest tightness, particularly for people with asthma."
+  },
+  {
+    code: "no2",
+    name: "Nitrogen dioxide (NO₂)",
+    symbol: "NO₂",
+    bandLowerBounds: [40, 70, 150, 200],
+    healthRisk: "Inflames the lining of the lungs, worsens asthma and lowers resistance to respiratory infections."
+  },
+  {
+    code: "pm10",
+    name: "Coarse particulate matter (PM10)",
+    symbol: "PM10",
+    bandLowerBounds: [20, 50, 100, 200],
+    healthRisk: "Inhaled particles irritate the eyes, nose and throat and can aggravate asthma and other lung conditions."
+  },
+  {
+    code: "pm2_5",
+    name: "Fine particulate matter (PM2.5)",
+    symbol: "PM2.5",
+    bandLowerBounds: [10, 25, 50, 75],
+    healthRisk: "Fine particles reach deep into the lungs and the bloodstream, aggravating heart and lung disease and increasing the risk of respiratory illness."
+  },
+  {
+    code: "o3",
+    name: "Ozone (O₃)",
+    symbol: "O₃",
+    bandLowerBounds: [60, 100, 140, 180],
+    healthRisk: "Causes coughing, throat irritation and reduced lung function, especially during exercise outdoors."
+  },
+  {
+    code: "co",
+    name: "Carbon monoxide (CO)",
+    symbol: "CO",
+    bandLowerBounds: [4400, 9400, 12400, 15400],
+    healthRisk: "Reduces the amount of oxygen the blood can carry, causing headaches, dizziness and added strain for people with heart disease."
+  }
+];
+
+const ADVICE_BY_LEVEL = {
+  Fair: "Unusually sensitive people may notice mild symptoms.",
+  Moderate: "Sensitive groups (children, older adults, people with asthma or heart disease) should limit prolonged outdoor exertion.",
+  Poor: "Everyone may begin to feel effects; sensitive groups should avoid outdoor exertion.",
+  "Very Poor": "Health alert: everyone should avoid outdoor exertion and consider wearing a mask outdoors."
+};
+
 app.use(express.static(path.resolve(__dirname, "public")));
 
 app.get("/api/forecast/:city", sendForecast);
+app.get("/api/air-quality", sendAirQuality);
 
 app.use((req, res) => {
   res.status(404).json({ error: "Resource not found." });
@@ -61,6 +116,28 @@ async function sendForecast(req, res) {
     });
   } catch (error) {
     sendError(res, error, `Could not find a forecast for "${city}".`);
+  }
+}
+
+async function sendAirQuality(req, res) {
+  const lat = parseFloat(req.query.lat);
+  const lon = parseFloat(req.query.lon);
+  if (isNaN(lat) || isNaN(lon)) {
+    res.status(400).json({ error: "lat and lon query parameters must be numbers." });
+    return;
+  }
+
+  try {
+    const airPollution = await fetchFromOpenWeather("data/2.5/air_pollution", { lat: lat, lon: lon });
+    const reading = airPollution.list[0];
+    const pollutants = classifyPollutants(reading.components);
+    res.json({
+      overallLevel: AIR_QUALITY_LEVELS[reading.main.aqi - 1],
+      pollutants: pollutants,
+      warnings: buildPollutantWarnings(pollutants)
+    });
+  } catch (error) {
+    sendError(res, error, "Could not find air quality data for that location.");
   }
 }
 
@@ -169,6 +246,47 @@ function summariseDay(date, entries) {
     averageWindSpeed: roundToOneDecimal(windSpeedTotal / entries.length),
     rainfall: roundToOneDecimal(rainfall)
   };
+}
+
+function classifyPollutants(components) {
+  return POLLUTANTS.map((pollutant) => {
+    const concentration = components[pollutant.code];
+    let levelIndex = 0;
+    pollutant.bandLowerBounds.forEach((bound) => {
+      if (concentration >= bound) {
+        levelIndex++;
+      }
+    });
+    return {
+      code: pollutant.code,
+      name: pollutant.name,
+      symbol: pollutant.symbol,
+      concentration: concentration,
+      goodLimit: pollutant.bandLowerBounds[0],
+      level: AIR_QUALITY_LEVELS[levelIndex],
+      healthRisk: pollutant.healthRisk
+    };
+  });
+}
+
+function buildPollutantWarnings(pollutants) {
+  const warnings = [];
+  pollutants.forEach((pollutant) => {
+    if (pollutant.level !== "Good") {
+      warnings.push({
+        code: pollutant.code,
+        name: pollutant.name,
+        symbol: pollutant.symbol,
+        level: pollutant.level,
+        concentration: pollutant.concentration,
+        goodLimit: pollutant.goodLimit,
+        timesGoodLimit: roundToOneDecimal(pollutant.concentration / pollutant.goodLimit),
+        healthRisk: pollutant.healthRisk,
+        advice: ADVICE_BY_LEVEL[pollutant.level]
+      });
+    }
+  });
+  return warnings;
 }
 
 function roundToOneDecimal(value) {
