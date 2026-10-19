@@ -301,6 +301,13 @@ h2 {
   transform: rotate(45deg);
 }
 
+.area-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
 .text-button {
   padding: 0;
   font: inherit;
@@ -320,6 +327,76 @@ h2 {
 .text-button:focus-visible {
   outline: 3px solid var(--raincoat);
   outline-offset: 3px;
+}
+
+.map-frame {
+  position: relative;
+  height: 340px;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  isolation: isolate;
+}
+
+.map-note {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  text-align: center;
+  color: var(--ink-soft);
+  background: var(--sky);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.map-loading {
+  background:
+    linear-gradient(var(--line) 1px, transparent 1px) 0 0 / 20% 20%,
+    linear-gradient(to right, var(--line) 1px, transparent 1px) 0 0 / 20% 20%,
+    var(--sky);
+  animation: waiting 1.4s ease-in-out infinite alternate;
+}
+
+@keyframes waiting {
+  to {
+    opacity: 0.5;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-loading {
+    animation: none;
+  }
+}
+
+.map .leaflet-tile-pane {
+  filter: grayscale(1) opacity(0.75);
+}
+
+.map .cell-label {
+  padding: 0;
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+
+.map .cell-label::before {
+  display: none;
+}
+
+.map .cell-value.on-dark {
+  color: #ffffff;
 }
 
 table {
@@ -580,6 +657,18 @@ tbody td.number {
 
   .summary tbody tr:last-child > * {
     padding-bottom: 0;
+  }
+
+  .area {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .area .map-frame {
+    flex: 1;
+    height: auto;
+    min-height: 160px;
   }
 }
 

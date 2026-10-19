@@ -6,8 +6,9 @@
   <title>Pack for the weather</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Sans:wght@400..700&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 </head>
 <body>
   <div id="app" class="page">
@@ -133,6 +134,18 @@
             </p>
             <p>{{ selectedWarning.healthRisk }} {{ selectedWarning.advice }}</p>
           </div>
+        </div>
+      </section>
+
+      <section class="area" aria-labelledby="area-title">
+        <div class="area-heading">
+          <h2 id="area-title">Around {{ forecast.city.name }}</h2>
+        </div>
+
+        <div class="map-frame">
+          <div id="area-map" class="map"></div>
+          <p v-if="isAreaLoading" class="map-note map-loading" role="status">Loading the area map…</p>
+          <p v-else-if="areaErrorMessage" class="map-note">{{ areaErrorMessage }}</p>
         </div>
       </section>
 

@@ -5,9 +5,32 @@ const HOT_ABOVE = 24;
 
 const SCALE_PADDING = 4;
 
+const MAP_LAYERS = [
+  {
+    id: "temperature", label: "Temperature", legendTitle: "Daytime high, °C", unit: "°C",
+    lowColour: "#fdf0b8", highColour: "#d9573a", minimumSpan: 4
+  }
+];
+
+const DARK_CELL_FROM = 0.55;
+
+const MAP_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+const MAP_ELEMENT_ID = "area-map";
+
 const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const SHORT_NAME_LENGTH = 3;
+
+const MAP_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+
+function blendColours(startColour, endColour, amount) {
+  const channels = [1, 3, 5].map((offset) => {
+    const start = parseInt(startColour.slice(offset, offset + 2), 16);
+    const end = parseInt(endColour.slice(offset, offset + 2), 16);
+    return Math.round(start + (end - start) * amount);
+  });
+  return `rgb(${channels.join(", ")})`;
+}
 
 createApp({
   data() {
@@ -18,7 +41,13 @@ createApp({
       forecast: null,
       airQuality: null,
       selectedWarning: null,
+      areaForecast: null,
+      areaErrorMessage: "",
+      isAreaLoading: false,
       isShowingPreviousCity: false,
+      mapLayers: MAP_LAYERS,
+      selectedLayer: "temperature",
+      selectedDayIndex: 0,
       isLoading: false,
       errorMessage: "",
       coldBelow: COLD_BELOW,
@@ -50,6 +79,7 @@ createApp({
         this.forecast = forecast;
         this.isShowingPreviousCity = false;
 
+        this.loadAreaForecast(this.forecast);
         this.airQuality = await this.getJson(
           `/api/air-quality?lat=${forecast.city.lat}&lon=${forecast.city.lon}`);
         this.selectedWarning = this.findWorstWarning(this.airQuality.warnings);
@@ -65,9 +95,34 @@ createApp({
     },
 
     clearResults() {
+      this.removeMap();
       this.forecast = null;
       this.airQuality = null;
       this.selectedWarning = null;
+      this.areaForecast = null;
+      this.areaErrorMessage = "";
+      this.isAreaLoading = false;
+      this.selectedDayIndex = 0;
+    },
+
+    async loadAreaForecast(forecast) {
+      this.isAreaLoading = true;
+      try {
+        const areaForecast = await this.getJson(
+          `/api/area-forecast?lat=${forecast.city.lat}&lon=${forecast.city.lon}`);
+        if (this.forecast === forecast) {
+          this.areaForecast = areaForecast;
+          this.drawMap();
+        }
+      } catch (error) {
+        if (this.forecast === forecast) {
+          this.areaErrorMessage = error.message;
+        }
+      } finally {
+        if (this.forecast === forecast) {
+          this.isAreaLoading = false;
+        }
+      }
     },
 
     findWorstWarning(warnings) {
@@ -153,6 +208,96 @@ createApp({
         }
       });
       return highest;
+    },
+
+    currentLayer() {
+      return this.mapLayers.find((layer) => layer.id === this.selectedLayer);
+    },
+
+    mapScale() {
+      const layer = this.currentLayer();
+      let min = this.areaForecast.days[0][layer.id].lowest.value;
+      let max = this.areaForecast.days[0][layer.id].highest.value;
+      this.areaForecast.days.forEach((areaDay) => {
+        const extremes = areaDay[layer.id];
+        if (extremes.lowest.value < min) {
+          min = extremes.lowest.value;
+        }
+        if (extremes.highest.value > max) {
+          max = extremes.highest.value;
+        }
+      });
+
+      if (layer.id === "rain") {
+        return { min: 0, max: Math.max(max, layer.minimumSpan) };
+      }
+      const shortfall = layer.minimumSpan - (max - min);
+      if (shortfall > 0) {
+        min -= shortfall / 2;
+        max += shortfall / 2;
+      }
+      return { min: min, max: max };
+    },
+
+    drawMap() {
+      this.removeMap();
+      const mapElement = document.getElementById(MAP_ELEMENT_ID);
+      const city = this.forecast.city;
+
+      this.leafletMap = L.map(mapElement, { scrollWheelZoom: false, zoomSnap: 0.25 });
+      L.tileLayer(MAP_TILE_URL, { attribution: MAP_ATTRIBUTION }).addTo(this.leafletMap);
+
+      this.cellRectangles = this.areaForecast.cells.map((cell) =>
+        L.rectangle(cell.bounds, { color: "#14293d", fillOpacity: 0.7 }).addTo(this.leafletMap));
+      const gridBounds = L.featureGroup(this.cellRectangles).getBounds();
+      this.leafletMap.fitBounds(gridBounds, { padding: [8, 8] });
+
+      this.mapResizeObserver = new ResizeObserver(() => {
+        this.leafletMap.invalidateSize();
+        this.leafletMap.fitBounds(gridBounds, { padding: [8, 8], animate: false });
+      });
+      this.mapResizeObserver.observe(mapElement);
+
+      L.circleMarker([city.lat, city.lon], { radius: 17, color: "#f4c430", weight: 3, fill: false, interactive: false })
+        .addTo(this.leafletMap);
+
+      this.paintMapCells();
+    },
+
+    removeMap() {
+      if (this.leafletMap) {
+        this.mapResizeObserver.disconnect();
+        this.leafletMap.remove();
+        this.leafletMap = null;
+        this.cellRectangles = null;
+      }
+    },
+
+    paintMapCells() {
+      if (!this.cellRectangles) {
+        return;
+      }
+      const layer = this.currentLayer();
+      const scale = this.mapScale();
+
+      this.cellRectangles.forEach((rectangle, index) => {
+        const value = this.areaForecast.cells[index].days[this.selectedDayIndex][layer.id];
+        const amount = Math.min(Math.max((value - scale.min) / (scale.max - scale.min), 0), 1);
+
+        rectangle.setStyle({
+          fillColor: blendColours(layer.lowColour, layer.highColour, amount),
+          weight: 1,
+          opacity: 0.2
+        });
+
+        const labelClass = amount > DARK_CELL_FROM ? "cell-value on-dark" : "cell-value";
+        rectangle.unbindTooltip();
+        rectangle.bindTooltip(`<span class="${labelClass}">${Math.round(value)}</span>`, {
+          permanent: true,
+          direction: "center",
+          className: "cell-label"
+        });
+      });
     },
 
     describePlace(place) {
