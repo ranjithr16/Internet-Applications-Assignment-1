@@ -104,6 +104,38 @@
           </tbody>
         </table>
       </section>
+
+      <section v-if="airQuality" class="panel air" aria-labelledby="air-title">
+        <div class="panel-heading">
+          <h2 id="air-title">Air quality</h2>
+          <p v-if="airQuality.warnings.length === 0" class="all-clear">
+            Every measured pollutant is in the Good range.
+          </p>
+          <p v-else class="air-summary">
+            Overall air quality is {{ airQuality.overallLevel.toLowerCase() }}.
+          </p>
+        </div>
+
+        <div v-if="selectedWarning">
+          <div class="pollutants">
+            <button v-for="warning in airQuality.warnings" :key="warning.code" type="button"
+                    class="pollutant" :class="[levelClass(warning.level), { selected: warning.code === selectedWarning.code }]"
+                    :aria-pressed="warning.code === selectedWarning.code" :title="warning.name"
+                    v-on:click="selectedWarning = warning">
+              <span class="pollutant-name">{{ warning.symbol }}</span>
+              <span class="level">{{ warning.level }}</span>
+            </button>
+          </div>
+          <div class="warning" :class="levelClass(selectedWarning.level)" aria-live="polite">
+            <p class="measurement">
+              {{ selectedWarning.name }} is at {{ selectedWarning.concentration }} μg/m³, which is
+              {{ selectedWarning.timesGoodLimit }} times the Good limit of {{ selectedWarning.goodLimit }} μg/m³.
+            </p>
+            <p>{{ selectedWarning.healthRisk }} {{ selectedWarning.advice }}</p>
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 

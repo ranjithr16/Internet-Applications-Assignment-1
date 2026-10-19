@@ -16,6 +16,8 @@ createApp({
       searchedName: "",
       isPlaceListOpen: false,
       forecast: null,
+      airQuality: null,
+      selectedWarning: null,
       isShowingPreviousCity: false,
       isLoading: false,
       errorMessage: "",
@@ -47,6 +49,10 @@ createApp({
         this.clearResults();
         this.forecast = forecast;
         this.isShowingPreviousCity = false;
+
+        this.airQuality = await this.getJson(
+          `/api/air-quality?lat=${forecast.city.lat}&lon=${forecast.city.lon}`);
+        this.selectedWarning = this.findWorstWarning(this.airQuality.warnings);
       } catch (error) {
         if (this.forecast === previousForecast) {
           this.clearResults();
@@ -60,6 +66,18 @@ createApp({
 
     clearResults() {
       this.forecast = null;
+      this.airQuality = null;
+      this.selectedWarning = null;
+    },
+
+    findWorstWarning(warnings) {
+      let worst = null;
+      warnings.forEach((warning) => {
+        if (worst === null || warning.timesGoodLimit > worst.timesGoodLimit) {
+          worst = warning;
+        }
+      });
+      return worst;
     },
 
     findRainyDays() {
@@ -230,5 +248,9 @@ createApp({
       const lastWord = words[words.length - 1];
       return `${words.slice(0, -1).join(", ")} and ${lastWord}`;
     },
+
+    levelClass(level) {
+      return `level-${level.toLowerCase().replace(" ", "-")}`;
+    }
   }
 }).mount("#app");
