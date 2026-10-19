@@ -12,6 +12,16 @@ const FORECAST_DAYS = 3;
 
 const MAX_PLACE_MATCHES = 5;
 
+const OPEN_METEO_FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
+const GRID_SIZE = 5;
+const GRID_SPACING_KM = 15;
+const KM_PER_DEGREE_LATITUDE = 111.32;
+const WET_DAY_THRESHOLD_MM = 1;
+const AREA_CACHE_LIFETIME_MS = 30 * 60 * 1000;
+const COMPASS_DIRECTIONS = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"];
+
+const areaForecastCache = {};
+
 if (!apiKey) {
   console.error("OPENWEATHER_API_KEY is not set. Copy .env.example to .env and add your key.");
   process.exit(1);
@@ -75,6 +85,7 @@ app.use(express.static(path.resolve(__dirname, "public")));
 
 app.get("/api/forecast/:city", sendForecast);
 app.get("/api/air-quality", sendAirQuality);
+app.get("/api/area-forecast", sendAreaForecast);
 
 app.use((req, res) => {
   res.status(404).json({ error: "Resource not found." });
@@ -138,6 +149,33 @@ async function sendAirQuality(req, res) {
     });
   } catch (error) {
     sendError(res, error, "Could not find air quality data for that location.");
+  }
+}
+
+async function sendAreaForecast(req, res) {
+  const lat = parseFloat(req.query.lat);
+  const lon = parseFloat(req.query.lon);
+  if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+    res.status(400).json({ error: "lat and lon query parameters must be valid coordinates." });
+    return;
+  }
+
+  const cacheKey = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+  const cached = areaForecastCache[cacheKey];
+  if (cached && Date.now() - cached.storedAt < AREA_CACHE_LIFETIME_MS) {
+    res.json(cached.areaForecast);
+    return;
+  }
+
+  try {
+    const gridPoints = buildGridPoints(lat, lon);
+    const pointForecasts = await fetchGridForecasts(gridPoints);
+    const areaForecast = summariseAreaForecast(gridPoints, pointForecasts);
+    areaForecastCache[cacheKey] = { storedAt: Date.now(), areaForecast: areaForecast };
+    res.json(areaForecast);
+  } catch (error) {
+    console.error(error.message);
+    res.status(502).json({ error: "The area forecast is unavailable right now." });
   }
 }
 
@@ -248,6 +286,129 @@ function summariseDay(date, entries) {
   };
 }
 
+function buildGridPoints(centreLat, centreLon) {
+  const latStep = GRID_SPACING_KM / KM_PER_DEGREE_LATITUDE;
+  const lonStep = GRID_SPACING_KM / (KM_PER_DEGREE_LATITUDE * Math.cos(toRadians(centreLat)));
+  const middle = (GRID_SIZE - 1) / 2;
+  const gridPoints = [];
+
+  for (let row = 0; row < GRID_SIZE; row++) {
+    for (let column = 0; column < GRID_SIZE; column++) {
+      const lat = centreLat + (middle - row) * latStep;
+      const lon = centreLon + (column - middle) * lonStep;
+      const kmEast = (column - middle) * GRID_SPACING_KM;
+      const kmNorth = (middle - row) * GRID_SPACING_KM;
+      gridPoints.push({
+        lat: lat,
+        lon: lon,
+        distanceKm: Math.round(Math.hypot(kmEast, kmNorth)),
+        direction: describeDirection(kmEast, kmNorth),
+        bounds: [
+          [lat - latStep / 2, lon - lonStep / 2],
+          [lat + latStep / 2, lon + lonStep / 2]
+        ]
+      });
+    }
+  }
+  return gridPoints;
+}
+
+async function fetchGridForecasts(gridPoints) {
+  const query = new URLSearchParams({
+    latitude: gridPoints.map((point) => point.lat.toFixed(4)).join(","),
+    longitude: gridPoints.map((point) => point.lon.toFixed(4)).join(","),
+    daily: "temperature_2m_max,precipitation_sum,wind_speed_10m_max",
+    wind_speed_unit: "ms",
+    forecast_days: FORECAST_DAYS,
+    timezone: "auto"
+  });
+  const response = await fetch(`${OPEN_METEO_FORECAST_URL}?${query}`);
+
+  if (!response.ok) {
+    throw new Error(`Open-Meteo responded with status ${response.status}`);
+  }
+  return response.json();
+}
+
+function summariseAreaForecast(gridPoints, pointForecasts) {
+  const centreIndex = Math.floor(gridPoints.length / 2);
+  const dates = pointForecasts[centreIndex].daily.time;
+
+  const cells = gridPoints.map((point, index) => {
+    const daily = pointForecasts[index].daily;
+    return {
+      bounds: point.bounds,
+      distanceKm: point.distanceKm,
+      direction: point.direction,
+      days: dates.map((date, dayIndex) => ({
+        temperature: daily.temperature_2m_max[dayIndex],
+        rain: roundToOneDecimal(daily.precipitation_sum[dayIndex]),
+        wind: roundToOneDecimal(daily.wind_speed_10m_max[dayIndex])
+      }))
+    };
+  });
+
+  const days = dates.map((date, dayIndex) => {
+    let wetCellCount = 0;
+    cells.forEach((cell) => {
+      if (cell.days[dayIndex].rain >= WET_DAY_THRESHOLD_MM) {
+        wetCellCount++;
+      }
+    });
+    return {
+      date: date,
+      wetCellCount: wetCellCount,
+      rainCoverage: roundToTwoDecimals(wetCellCount / cells.length),
+      temperature: findExtremes(cells, dayIndex, "temperature", centreIndex),
+      rain: findExtremes(cells, dayIndex, "rain", centreIndex),
+      wind: findExtremes(cells, dayIndex, "wind", centreIndex)
+    };
+  });
+
+  const modelCells = new Set(pointForecasts.map((forecast) => `${forecast.latitude},${forecast.longitude}`));
+
+  return {
+    source: "Open-Meteo",
+    gridSize: GRID_SIZE,
+    spacingKm: GRID_SPACING_KM,
+    widthKm: GRID_SIZE * GRID_SPACING_KM,
+    cellCount: cells.length,
+    distinctModelCellCount: modelCells.size,
+    wetDayThresholdMm: WET_DAY_THRESHOLD_MM,
+    days: days,
+    cells: cells
+  };
+}
+
+function findExtremes(cells, dayIndex, measure, centreIndex) {
+  let lowestIndex = 0;
+  let highestIndex = 0;
+
+  cells.forEach((cell, index) => {
+    const value = cell.days[dayIndex][measure];
+    if (value < cells[lowestIndex].days[dayIndex][measure]) {
+      lowestIndex = index;
+    }
+    if (value > cells[highestIndex].days[dayIndex][measure]) {
+      highestIndex = index;
+    }
+  });
+
+  return {
+    cityValue: cells[centreIndex].days[dayIndex][measure],
+    lowest: { cellIndex: lowestIndex, value: cells[lowestIndex].days[dayIndex][measure] },
+    highest: { cellIndex: highestIndex, value: cells[highestIndex].days[dayIndex][measure] }
+  };
+}
+
+function describeDirection(kmEast, kmNorth) {
+  if (kmEast === 0 && kmNorth === 0) {
+    return "centre";
+  }
+  const bearing = (toDegrees(Math.atan2(kmEast, kmNorth)) + 360) % 360;
+  return COMPASS_DIRECTIONS[Math.round(bearing / 45) % COMPASS_DIRECTIONS.length];
+}
+
 function classifyPollutants(components) {
   return POLLUTANTS.map((pollutant) => {
     const concentration = components[pollutant.code];
@@ -291,4 +452,16 @@ function buildPollutantWarnings(pollutants) {
 
 function roundToOneDecimal(value) {
   return Math.round(value * 10) / 10;
+}
+
+function roundToTwoDecimals(value) {
+  return Math.round(value * 100) / 100;
+}
+
+function toRadians(degrees) {
+  return (degrees * Math.PI) / 180;
+}
+
+function toDegrees(radians) {
+  return (radians * 180) / Math.PI;
 }
