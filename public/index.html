@@ -140,7 +140,23 @@
       <section class="area" aria-labelledby="area-title">
         <div class="area-heading">
           <h2 id="area-title">Around {{ forecast.city.name }}</h2>
+          <button v-if="areaForecast" type="button" class="text-button" :aria-expanded="isMapGuideOpen"
+                  v-on:click="isMapGuideOpen = !isMapGuideOpen">
+            {{ isMapGuideOpen ? 'Hide guide' : 'How to read this' }}
+          </button>
         </div>
+        <div v-if="areaForecast && isMapGuideOpen" class="map-guide">
+          <p>
+            The forecast for {{ areaForecast.cellCount }} areas across {{ areaForecast.widthKm }} km,
+            to show where it is warmer, wetter or windier than the city itself.
+            The two outlined areas are the lowest and highest, and the ring marks the city.
+          </p>
+          <p>
+            Area data comes from {{ areaForecast.source }}, a separate source from the city forecast.
+            The {{ areaForecast.cellCount }} sample points fall in
+            {{ areaForecast.distinctModelCellCount }} different cells of its forecast model.
+          </p>
+        </div> 
 
         <fieldset v-if="areaForecast" class="layer-toggle">
           <legend class="visually-hidden">Map shows</legend>
@@ -157,7 +173,7 @@
           <p v-else-if="areaErrorMessage" class="map-note">{{ areaErrorMessage }}</p>
         </div>
 
-                <div v-if="areaForecast">
+        <div v-if="areaForecast">
           <div class="map-legend" aria-hidden="true">
             <span class="legend-title">{{ mapLegend().title }}</span>
             <span>{{ mapLegend().lowLabel }}</span>
@@ -176,9 +192,10 @@
               </span>
             </div>
           </div>
+
+          <p class="area-summary" aria-live="polite">{{ areaSummary() }}</p>
         </div>
       </section>
-
     </main>
   </div>
 

@@ -338,6 +338,16 @@ h2 {
   outline-offset: 3px;
 }
 
+.map-guide {
+  margin-bottom: 12px;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.map-guide p + p {
+  margin-top: 6px;
+}
+
 .layer-toggle {
   display: inline-flex;
   margin: 0 0 12px;
@@ -439,6 +449,12 @@ h2 {
 
 .map .cell-value.on-dark {
   color: #ffffff;
+}
+
+.area-summary {
+  min-height: 4.5em;
+  margin-top: 12px;
+  font-weight: 500;
 }
 
 table {

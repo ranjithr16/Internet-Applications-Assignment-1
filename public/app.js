@@ -19,6 +19,7 @@ const MAP_LAYERS = [
     lowColour: "#e7f2ee", highColour: "#1d6a5c", minimumSpan: 4
   }
 ];
+
 const DARK_CELL_FROM = 0.55;
 
 const MAP_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
@@ -51,6 +52,7 @@ createApp({
       areaForecast: null,
       areaErrorMessage: "",
       isAreaLoading: false,
+      isMapGuideOpen: false,
       isShowingPreviousCity: false,
       mapLayers: MAP_LAYERS,
       selectedLayer: "temperature",
@@ -257,6 +259,33 @@ createApp({
       };
     },
 
+    areaSummary() {
+      const areaDay = this.areaForecast.days[this.selectedDayIndex];
+      const weekday = this.formatWeekday(areaDay.date);
+      const extremes = areaDay[this.selectedLayer];
+
+      if (this.selectedLayer === "rain") {
+        if (extremes.highest.value === 0) {
+          return `${weekday}: no rain is forecast anywhere in the area.`;
+        }
+        return `${weekday}: ${areaDay.wetCellCount} of ${this.areaForecast.cellCount} areas have a wet day `
+          + `(${this.areaForecast.wetDayThresholdMm} mm or more). The city gets ${extremes.cityValue} mm; `
+          + `the wettest spot, ${this.describeLocation(extremes.highest.cellIndex)}, gets ${extremes.highest.value} mm.`;
+      }
+
+      if (this.selectedLayer === "wind") {
+        return `${weekday}: ` + this.compareWithCity(extremes, "wind in the city peaks at", "windiest", "calmest");
+      }
+
+      let summary = `${weekday}: ` + this.compareWithCity(extremes, "the city reaches", "warmest", "coolest");
+      const coolestCategory = this.temperatureCategory(extremes.lowest.value);
+      const warmestCategory = this.temperatureCategory(extremes.highest.value);
+      if (coolestCategory !== warmestCategory) {
+        summary += ` That is ${coolestCategory} in one place and ${warmestCategory} in another.`;
+      }
+      return summary;
+    },
+
     drawMap() {
       this.removeMap();
       const mapElement = document.getElementById(MAP_ELEMENT_ID);
@@ -297,16 +326,23 @@ createApp({
       }
       const layer = this.currentLayer();
       const scale = this.mapScale();
+      const extremes = this.areaForecast.days[this.selectedDayIndex][layer.id];
+      const hasContrast = extremes.highest.value > extremes.lowest.value;
 
       this.cellRectangles.forEach((rectangle, index) => {
         const value = this.areaForecast.cells[index].days[this.selectedDayIndex][layer.id];
         const amount = Math.min(Math.max((value - scale.min) / (scale.max - scale.min), 0), 1);
+        const isExtreme = hasContrast
+          && (index === extremes.lowest.cellIndex || index === extremes.highest.cellIndex);
 
         rectangle.setStyle({
           fillColor: blendColours(layer.lowColour, layer.highColour, amount),
-          weight: 1,
-          opacity: 0.2
+          weight: isExtreme ? 3 : 1,
+          opacity: isExtreme ? 1 : 0.2
         });
+        if (isExtreme) {
+          rectangle.bringToFront();
+        }
 
         const labelClass = amount > DARK_CELL_FROM ? "cell-value on-dark" : "cell-value";
         rectangle.unbindTooltip();
@@ -318,6 +354,26 @@ createApp({
       });
     },
 
+    compareWithCity(extremes, cityPhrase, highestWord, lowestWord) {
+      const unit = this.currentLayer().unit;
+      const cityValue = extremes.cityValue;
+      const lowest = extremes.lowest;
+      const highest = extremes.highest;
+      const lowestSpot = `${lowestWord} ${this.describeLocation(lowest.cellIndex)} (${lowest.value}${unit})`;
+      const highestSpot = `${highestWord} ${this.describeLocation(highest.cellIndex)} (${highest.value}${unit})`;
+
+      if (lowest.value === highest.value) {
+        return `it is ${cityValue}${unit} everywhere in the area.`;
+      }
+      if (this.areaForecast.cells[highest.cellIndex].distanceKm === 0) {
+        return `the city is the ${highestWord} spot, at ${cityValue}${unit}. It is ${lowestSpot}.`;
+      }
+      if (this.areaForecast.cells[lowest.cellIndex].distanceKm === 0) {
+        return `the city is the ${lowestWord} spot, at ${cityValue}${unit}. It is ${highestSpot}.`;
+      }
+      return `${cityPhrase} ${cityValue}${unit}. It is ${highestSpot} and ${lowestSpot}.`;
+    },
+
     describePlace(place) {
       const parts = [place.name];
       if (place.state) {
@@ -325,6 +381,21 @@ createApp({
       }
       parts.push(place.country);
       return parts.join(", ");
+    },
+
+    describeLocation(cellIndex) {
+      const cell = this.areaForecast.cells[cellIndex];
+      if (cell.distanceKm === 0) {
+        return "in the city itself";
+      }
+      return `${cell.distanceKm} km to the ${cell.direction}`;
+    },
+
+    temperatureCategory(temperature) {
+      if (temperature < COLD_BELOW) {
+        return "cold";
+      }
+      return temperature > HOT_ABOVE ? "hot" : "mild";
     },
 
     async getJson(url) {
