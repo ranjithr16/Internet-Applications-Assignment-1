@@ -9,9 +9,16 @@ const MAP_LAYERS = [
   {
     id: "temperature", label: "Temperature", legendTitle: "Daytime high, °C", unit: "°C",
     lowColour: "#fdf0b8", highColour: "#d9573a", minimumSpan: 4
+  },
+  {
+    id: "rain", label: "Rain", legendTitle: "Rain, mm", unit: " mm",
+    lowColour: "#e6eef5", highColour: "#14293d", minimumSpan: 10
+  },
+  {
+    id: "wind", label: "Wind", legendTitle: "Strongest wind, m/s", unit: " m/s",
+    lowColour: "#e7f2ee", highColour: "#1d6a5c", minimumSpan: 4
   }
 ];
-
 const DARK_CELL_FROM = 0.55;
 
 const MAP_TILE_URL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
@@ -237,6 +244,17 @@ createApp({
         max += shortfall / 2;
       }
       return { min: min, max: max };
+    },
+
+    mapLegend() {
+      const layer = this.currentLayer();
+      const scale = this.mapScale();
+      return {
+        title: layer.legendTitle,
+        lowLabel: Math.round(scale.min),
+        highLabel: Math.round(scale.max),
+        gradient: `linear-gradient(to right, ${layer.lowColour}, ${layer.highColour})`
+      };
     },
 
     drawMap() {

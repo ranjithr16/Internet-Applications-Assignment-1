@@ -43,6 +43,15 @@ p {
   padding: 40px 24px 80px;
 }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .wordmark {
   font-family: var(--font-display);
   font-weight: 600;
@@ -327,6 +336,39 @@ h2 {
 .text-button:focus-visible {
   outline: 3px solid var(--raincoat);
   outline-offset: 3px;
+}
+
+.layer-toggle {
+  display: inline-flex;
+  margin: 0 0 12px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.layer-toggle label {
+  padding: 6px 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.layer-toggle label + label {
+  border-left: 2px solid var(--ink);
+}
+
+.layer-toggle label.selected {
+  background: var(--raincoat);
+}
+
+.layer-toggle label:focus-within {
+  outline: 3px solid var(--ink);
+  outline-offset: -5px;
+}
+
+.layer-toggle input {
+  position: absolute;
+  opacity: 0;
 }
 
 .map-frame {
@@ -663,6 +705,10 @@ tbody td.number {
     display: flex;
     flex-direction: column;
     min-height: 0;
+  }
+
+  .area .layer-toggle {
+    align-self: flex-start;
   }
 
   .area .map-frame {

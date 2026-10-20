@@ -142,10 +142,40 @@
           <h2 id="area-title">Around {{ forecast.city.name }}</h2>
         </div>
 
+        <fieldset v-if="areaForecast" class="layer-toggle">
+          <legend class="visually-hidden">Map shows</legend>
+          <label v-for="layer in mapLayers" :key="layer.id" :class="{ selected: selectedLayer === layer.id }">
+            <input type="radio" name="map-layer" v-model="selectedLayer" :value="layer.id"
+                   v-on:change="paintMapCells">
+            {{ layer.label }}
+          </label>
+        </fieldset>
+
         <div class="map-frame">
           <div id="area-map" class="map"></div>
           <p v-if="isAreaLoading" class="map-note map-loading" role="status">Loading the area map…</p>
           <p v-else-if="areaErrorMessage" class="map-note">{{ areaErrorMessage }}</p>
+        </div>
+
+                <div v-if="areaForecast">
+          <div class="map-legend" aria-hidden="true">
+            <span class="legend-title">{{ mapLegend().title }}</span>
+            <span>{{ mapLegend().lowLabel }}</span>
+            <span class="ramp" :style="{ background: mapLegend().gradient }"></span>
+            <span>{{ mapLegend().highLabel }}</span>
+          </div>
+
+          <div class="day-slider">
+            <input type="range" min="0" :max="areaForecast.days.length - 1" step="1"
+                   v-model.number="selectedDayIndex" v-on:input="paintMapCells"
+                   aria-label="Day shown on the map">
+            <div class="day-ticks" aria-hidden="true">
+              <span v-for="(day, index) in areaForecast.days" :key="day.date"
+                    :class="{ current: index === selectedDayIndex }">
+                {{ formatShortWeekday(day.date) }}
+              </span>
+            </div>
+          </div>
         </div>
       </section>
 
