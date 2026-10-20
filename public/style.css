@@ -451,6 +451,53 @@ h2 {
   color: #ffffff;
 }
 
+.legend-title {
+  margin-right: 4px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.map-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+}
+
+.ramp {
+  flex: 1;
+  height: 10px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+
+.day-slider {
+  margin-top: 16px;
+}
+
+.day-slider input {
+  display: block;
+  width: 100%;
+  margin: 0;
+  accent-color: var(--ink);
+}
+
+.day-ticks {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.day-ticks .current {
+  font-weight: 600;
+  color: var(--ink);
+}
+
 .area-summary {
   min-height: 4.5em;
   margin-top: 12px;

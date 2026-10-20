@@ -175,7 +175,8 @@ createApp({
       if (rainyDays.length > 0) {
         items.push({
           name: "Umbrella",
-          reason: `Rain is forecast on ${this.describeDays(rainyDays)}.`
+          reason: `Rain is forecast on ${this.describeDays(rainyDays)}.`,
+          detail: this.rainCoverageNote(rainyDays)
         });
       }
       if (coldDays.length > 0) {
@@ -197,6 +198,30 @@ createApp({
         });
       }
       return items;
+    },
+
+    rainCoverageNote(rainyDays) {
+      if (!this.areaForecast) {
+        return "";
+      }
+
+      let wettestDay = null;
+      this.areaForecast.days.forEach((areaDay) => {
+        const isRainyDay = rainyDays.find((day) => day.date === areaDay.date);
+        if (isRainyDay && (wettestDay === null || areaDay.rainCoverage > wettestDay.rainCoverage)) {
+          wettestDay = areaDay;
+        }
+      });
+
+      if (wettestDay === null) {
+        return "";
+      }
+      if (wettestDay.wetCellCount === 0) {
+        return "The surrounding area stays mostly dry, so expect light or isolated showers.";
+      }
+      return `It looks ${this.describeCoverage(wettestDay.rainCoverage)} on `
+        + `${this.formatWeekday(wettestDay.date)}: ${wettestDay.wetCellCount} of `
+        + `${this.areaForecast.cellCount} nearby areas get a wet day.`;
     },
 
     lowestTemperature(days) {
@@ -396,6 +421,19 @@ createApp({
         return "cold";
       }
       return temperature > HOT_ABOVE ? "hot" : "mild";
+    },
+
+    describeCoverage(rainCoverage) {
+      if (rainCoverage < 0.2) {
+        return "isolated";
+      }
+      if (rainCoverage < 0.5) {
+        return "scattered";
+      }
+      if (rainCoverage < 0.8) {
+        return "fairly widespread";
+      }
+      return "widespread";
     },
 
     async getJson(url) {
