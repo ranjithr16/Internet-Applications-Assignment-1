@@ -29,6 +29,7 @@ if (!apiKey) {
 
 const AIR_QUALITY_LEVELS = ["Good", "Fair", "Moderate", "Poor", "Very Poor"];
 
+// Pollutants we report on, with the lower bound of each air quality band after "Good" (µg/m³).
 const POLLUTANTS = [
   {
     code: "so2",
@@ -74,6 +75,7 @@ const POLLUTANTS = [
   }
 ];
 
+// Health advice shown alongside a pollutant warning, by level.
 const ADVICE_BY_LEVEL = {
   Fair: "Unusually sensitive people may notice mild symptoms.",
   Moderate: "Sensitive groups (children, older adults, people with asthma or heart disease) should limit prolonged outdoor exertion.",
@@ -81,12 +83,14 @@ const ADVICE_BY_LEVEL = {
   "Very Poor": "Health alert: everyone should avoid outdoor exertion and consider wearing a mask outdoors."
 };
 
+// Serve the front end and register the API routes.
 app.use(express.static(path.resolve(__dirname, "public")));
 
 app.get("/api/forecast/:city", sendForecast);
 app.get("/api/air-quality", sendAirQuality);
 app.get("/api/area-forecast", sendAreaForecast);
 
+// Fallback for unknown routes.
 app.use((req, res) => {
   res.status(404).json({ error: "Resource not found." });
 });
@@ -95,6 +99,7 @@ app.listen(port, () => {
   console.log(`Weather packing server is running at http://localhost:${port}`);
 });
 
+// GET /api/forecast/:city - 3-day forecast for a city, using ?match= to pick between places with the same name.
 async function sendForecast(req, res) {
   const city = req.params.city.trim();
   if (city === "") {
@@ -130,6 +135,7 @@ async function sendForecast(req, res) {
   }
 }
 
+// GET /api/air-quality - current air quality and pollutant warnings for a lat/lon.
 async function sendAirQuality(req, res) {
   const lat = parseFloat(req.query.lat);
   const lon = parseFloat(req.query.lon);
@@ -152,6 +158,7 @@ async function sendAirQuality(req, res) {
   }
 }
 
+// GET /api/area-forecast - forecast for a grid around a lat/lon, cached for 30 minutes.
 async function sendAreaForecast(req, res) {
   const lat = parseFloat(req.query.lat);
   const lon = parseFloat(req.query.lon);
@@ -179,6 +186,7 @@ async function sendAreaForecast(req, res) {
   }
 }
 
+// Looks up places matching a city name, dropping duplicate name/state/country entries.
 async function findPlaces(city) {
   const matches = await fetchFromOpenWeather("geo/1.0/direct", { q: city, limit: MAX_PLACE_MATCHES });
   if (matches.length === 0) {
@@ -206,6 +214,7 @@ async function findPlaces(city) {
   return places;
 }
 
+// Every place except the chosen one, so the user can switch to another match.
 function listOtherPlaces(places, chosenPlace) {
   const otherPlaces = [];
   places.forEach((place) => {
@@ -216,6 +225,7 @@ function listOtherPlaces(places, chosenPlace) {
   return otherPlaces;
 }
 
+// Calls an OpenWeatherMap endpoint with the API key and returns the JSON, throwing on a non-OK response.
 async function fetchFromOpenWeather(endpoint, queryParameters) {
   const query = new URLSearchParams(queryParameters);
   query.append("appid", apiKey);
@@ -229,6 +239,7 @@ async function fetchFromOpenWeather(endpoint, queryParameters) {
   return response.json();
 }
 
+// Sends a 404 if the upstream said not found, otherwise a generic 502.
 function sendError(res, error, notFoundMessage) {
   if (error.upstreamStatus === 404) {
     res.status(404).json({ error: notFoundMessage });
@@ -238,6 +249,7 @@ function sendError(res, error, notFoundMessage) {
   res.status(502).json({ error: "The weather service is unavailable right now. Please try again later." });
 }
 
+// Groups the 3-hourly forecast entries by the city's local date and summarises the first few days.
 function summariseForecastByDay(forecastEntries, timezoneOffsetSeconds) {
   const days = [];
 
@@ -254,6 +266,7 @@ function summariseForecastByDay(forecastEntries, timezoneOffsetSeconds) {
   return days.slice(0, FORECAST_DAYS).map((day) => summariseDay(day.date, day.entries));
 }
 
+// Min/max/average temperature, average wind and total rainfall for one day's entries.
 function summariseDay(date, entries) {
   let minTemperature = entries[0].main.temp;
   let maxTemperature = entries[0].main.temp;
@@ -286,6 +299,7 @@ function summariseDay(date, entries) {
   };
 }
 
+// Builds a square grid of points centred on the city, each with its distance, direction and map bounds.
 function buildGridPoints(centreLat, centreLon) {
   const latStep = GRID_SPACING_KM / KM_PER_DEGREE_LATITUDE;
   const lonStep = GRID_SPACING_KM / (KM_PER_DEGREE_LATITUDE * Math.cos(toRadians(centreLat)));
@@ -313,6 +327,7 @@ function buildGridPoints(centreLat, centreLon) {
   return gridPoints;
 }
 
+// Fetches daily forecasts for every grid point in a single Open-Meteo request.
 async function fetchGridForecasts(gridPoints) {
   const query = new URLSearchParams({
     latitude: gridPoints.map((point) => point.lat.toFixed(4)).join(","),
@@ -330,6 +345,7 @@ async function fetchGridForecasts(gridPoints) {
   return response.json();
 }
 
+// Combines the grid forecasts into per-cell values and per-day extremes and rain coverage.
 function summariseAreaForecast(gridPoints, pointForecasts) {
   const centreIndex = Math.floor(gridPoints.length / 2);
   const dates = pointForecasts[centreIndex].daily.time;
@@ -380,6 +396,7 @@ function summariseAreaForecast(gridPoints, pointForecasts) {
   };
 }
 
+// The city's value plus the lowest and highest cells for one measure on one day.
 function findExtremes(cells, dayIndex, measure, centreIndex) {
   let lowestIndex = 0;
   let highestIndex = 0;
@@ -401,6 +418,7 @@ function findExtremes(cells, dayIndex, measure, centreIndex) {
   };
 }
 
+// Turns an east/north offset into a compass direction like "north-east".
 function describeDirection(kmEast, kmNorth) {
   if (kmEast === 0 && kmNorth === 0) {
     return "centre";
@@ -409,6 +427,7 @@ function describeDirection(kmEast, kmNorth) {
   return COMPASS_DIRECTIONS[Math.round(bearing / 45) % COMPASS_DIRECTIONS.length];
 }
 
+// Assigns an air quality level to each pollutant based on its concentration.
 function classifyPollutants(components) {
   return POLLUTANTS.map((pollutant) => {
     const concentration = components[pollutant.code];
@@ -430,6 +449,7 @@ function classifyPollutants(components) {
   });
 }
 
+// Warnings for any pollutant above "Good", with how far over the limit it is and advice.
 function buildPollutantWarnings(pollutants) {
   const warnings = [];
   pollutants.forEach((pollutant) => {
@@ -450,6 +470,7 @@ function buildPollutantWarnings(pollutants) {
   return warnings;
 }
 
+// Small numeric helpers.
 function roundToOneDecimal(value) {
   return Math.round(value * 10) / 10;
 }

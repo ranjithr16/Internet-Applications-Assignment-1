@@ -5,6 +5,7 @@ const HOT_ABOVE = 24;
 
 const SCALE_PADDING = 4;
 
+// Map layers the user can toggle between, with legend text and colour ramp.
 const MAP_LAYERS = [
   {
     id: "temperature", label: "Temperature", legendTitle: "Daytime high, °C", unit: "°C",
@@ -31,6 +32,7 @@ const SHORT_NAME_LENGTH = 3;
 
 const MAP_ATTRIBUTION = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
 
+// Mixes two hex colours, amount 0 = start colour, 1 = end colour.
 function blendColours(startColour, endColour, amount) {
   const channels = [1, 3, 5].map((offset) => {
     const start = parseInt(startColour.slice(offset, offset + 2), 16);
@@ -65,15 +67,18 @@ createApp({
   },
 
   methods: {
+    // Search for the typed city, using its top match.
     searchCity() {
       this.searchedName = this.cityInput;
       return this.loadForecast(0);
     },
 
+    // Switch to another place with the same name.
     choosePlace(place) {
       return this.loadForecast(place.matchIndex);
     },
 
+    // Loads the forecast, then the area map and air quality, keeping the previous city on screen until it succeeds.
     async loadForecast(matchIndex) {
       const previousForecast = this.forecast;
       this.isPlaceListOpen = false;
@@ -103,6 +108,7 @@ createApp({
       }
     },
 
+    // Resets everything shown for the current city.
     clearResults() {
       this.removeMap();
       this.forecast = null;
@@ -114,6 +120,7 @@ createApp({
       this.selectedDayIndex = 0;
     },
 
+    // Loads the area grid and draws the map, ignoring the result if the user has moved on to another city.
     async loadAreaForecast(forecast) {
       this.isAreaLoading = true;
       try {
@@ -134,6 +141,7 @@ createApp({
       }
     },
 
+    // The pollutant warning furthest over its "Good" limit.
     findWorstWarning(warnings) {
       let worst = null;
       warnings.forEach((warning) => {
@@ -154,6 +162,7 @@ createApp({
       return rainyDays;
     },
 
+    // Builds the packing list items from rain and cold/mild/hot days.
     packingList() {
       const rainyDays = this.findRainyDays();
       const coldDays = [];
@@ -200,6 +209,7 @@ createApp({
       return items;
     },
 
+    // Describes how widespread the rain is around the city on the wettest rainy day.
     rainCoverageNote(rainyDays) {
       if (!this.areaForecast) {
         return "";
@@ -224,6 +234,7 @@ createApp({
         + `${this.areaForecast.cellCount} nearby areas get a wet day.`;
     },
 
+    // Lowest and highest temperatures across a set of days.
     lowestTemperature(days) {
       let lowest = days[0].minTemperature;
       days.forEach((day) => {
@@ -244,10 +255,12 @@ createApp({
       return highest;
     },
 
+    // The selected map layer definition.
     currentLayer() {
       return this.mapLayers.find((layer) => layer.id === this.selectedLayer);
     },
 
+    // Colour scale range for the current layer across all days, padded out to a minimum span.
     mapScale() {
       const layer = this.currentLayer();
       let min = this.areaForecast.days[0][layer.id].lowest.value;
@@ -273,6 +286,7 @@ createApp({
       return { min: min, max: max };
     },
 
+    // Title, end labels and gradient for the map legend.
     mapLegend() {
       const layer = this.currentLayer();
       const scale = this.mapScale();
@@ -284,6 +298,7 @@ createApp({
       };
     },
 
+    // Plain-English summary of the map for the selected day and layer.
     areaSummary() {
       const areaDay = this.areaForecast.days[this.selectedDayIndex];
       const weekday = this.formatWeekday(areaDay.date);
@@ -311,6 +326,7 @@ createApp({
       return summary;
     },
 
+    // Creates the Leaflet map with a rectangle per grid cell and a marker on the city.
     drawMap() {
       this.removeMap();
       const mapElement = document.getElementById(MAP_ELEMENT_ID);
@@ -336,6 +352,7 @@ createApp({
       this.paintMapCells();
     },
 
+    // Tears down the Leaflet map and its resize observer.
     removeMap() {
       if (this.leafletMap) {
         this.mapResizeObserver.disconnect();
@@ -345,6 +362,7 @@ createApp({
       }
     },
 
+    // Colours and labels each cell for the selected day and layer, outlining the extremes.
     paintMapCells() {
       if (!this.cellRectangles) {
         return;
@@ -379,6 +397,7 @@ createApp({
       });
     },
 
+    // Sentence comparing the city with the highest and lowest spots nearby.
     compareWithCity(extremes, cityPhrase, highestWord, lowestWord) {
       const unit = this.currentLayer().unit;
       const cityValue = extremes.cityValue;
@@ -399,6 +418,7 @@ createApp({
       return `${cityPhrase} ${cityValue}${unit}. It is ${highestSpot} and ${lowestSpot}.`;
     },
 
+    // Text helpers for places, map cells, temperatures and rain coverage.
     describePlace(place) {
       const parts = [place.name];
       if (place.state) {
@@ -436,6 +456,7 @@ createApp({
       return "widespread";
     },
 
+    // Fetches JSON from our API, throwing the server error message on failure.
     async getJson(url) {
       const response = await fetch(url);
       const body = await response.json();
@@ -445,6 +466,7 @@ createApp({
       return body;
     },
 
+    // Temperature range bar helpers: scale bounds, positions and styles.
     temperatureScale() {
       const days = this.forecast.days;
       return {
@@ -471,6 +493,7 @@ createApp({
       return { left: `${start}%`, width: `${end - start}%` };
     },
 
+    // Date formatting helpers.
     formatWeekday(isoDate) {
       return WEEKDAY_NAMES[this.toDate(isoDate).getUTCDay()];
     },
@@ -488,6 +511,7 @@ createApp({
       return new Date(`${isoDate}T00:00:00Z`);
     },
 
+    // Text helpers for the packing list reasons.
     describeDays(days) {
       if (days.length === this.forecast.days.length) {
         return "all three days";
@@ -521,6 +545,7 @@ createApp({
       return `${words.slice(0, -1).join(", ")} and ${lastWord}`;
     },
 
+    // CSS class for an air quality level, e.g. "level-very-poor".
     levelClass(level) {
       return `level-${level.toLowerCase().replace(" ", "-")}`;
     }
